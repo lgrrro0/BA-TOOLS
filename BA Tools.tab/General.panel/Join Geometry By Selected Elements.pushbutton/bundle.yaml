@@ -1,0 +1,11 @@
+title: Join Geometry
+tooltip: >
+  Joins geometry between two categories visible in the active view.
+
+  You will be prompted to select one CUTTING element (e.g. a column)
+  and one OTHER element to be cut (e.g. a floor). The tool then finds
+  every element of those two categories in the active view, joins each
+  touching pair, and gives geometry priority to the cutting category.
+
+author: Luis Guerrero
+highlight: new
