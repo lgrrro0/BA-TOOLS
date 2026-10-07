@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concrete Changes</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1d2433; --muted: #5b6475; --line: #e3e6eb;
+  --hover: #f0f3f8; --sel: #f5e8fb; --accent: #4b5563;
+  --new: #2563eb; --deleted: #dc2626; --mod-old: #eab308; --mod-new: #ea580c; --pick: #c026d3;
+  --grid: #64748b; --level: #0e7490;
+  --viewer: #eef1f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1a1f27; --text: #e6e9ef; --muted: #9aa3b2; --line: #2a313c;
+    --hover: #212833; --sel: #35203f; --accent: #cbd5e1;
+    --new: #5b8cff; --deleted: #f05252; --mod-old: #facc15; --mod-new: #fb8c3c; --pick: #e879f9;
+    --grid: #8b9bb0; --level: #22d3ee;
+    --viewer: #0e1116;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #1a1f27; --text: #e6e9ef; --muted: #9aa3b2; --line: #2a313c;
+  --hover: #212833; --sel: #35203f; --accent: #cbd5e1;
+  --new: #5b8cff; --deleted: #f05252; --mod-old: #facc15; --mod-new: #fb8c3c; --pick: #e879f9;
+  --grid: #8b9bb0; --level: #22d3ee;
+  --viewer: #0e1116;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; }
+header { padding: 14px 20px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
+h1 { font-size: 18px; margin: 0 0 2px; font-weight: 600; }
+.meta { color: var(--muted); font-size: 12.5px; }
+.meta b { color: var(--text); font-weight: 600; }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; min-width: 92px; background: var(--bg); }
+.stat .n { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.toolbar { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.group { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.group > span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; user-select: none; }
+.chip[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.chip .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+input[type=search] { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 6px; padding: 5px 9px; min-width: 200px; font: inherit; }
+button.act { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 4px 9px; cursor: pointer; font: inherit; font-size: 12.5px; }
+button.act:hover { background: var(--hover); }
+button.act:disabled { opacity: .4; cursor: default; }
+button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.act.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.act.on { border-color: var(--accent); color: var(--accent); }
+main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); min-height: 0; }
+.tablewrap { overflow: auto; border-right: 1px solid var(--line); background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { position: sticky; top: 0; background: var(--panel); text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); z-index: 1; white-space: nowrap; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr.r { cursor: pointer; }
+tr.r:hover td { background: var(--hover); }
+tr.r.sel td { background: var(--sel); }
+td.id { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.st::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.st.New { color: var(--new); } .st.New::before { background: var(--new); }
+.st.Modified { color: var(--mod-new); } .st.Modified::before { background: linear-gradient(90deg, var(--mod-old) 50%, var(--mod-new) 50%); }
+.st.Deleted { color: var(--deleted); } .st.Deleted::before { background: var(--deleted); }
+.layer { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 4px 10px 4px 8px; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.layer i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.layer .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.layer[aria-pressed="false"] { opacity: .5; }
+.layer[aria-pressed="false"] i { background: transparent !important; box-shadow: inset 0 0 0 2px var(--muted); }
+.sub { color: var(--muted); font-size: 12px; }
+.empty { padding: 30px; color: var(--muted); text-align: center; }
+.viewer { position: relative; background: var(--viewer); min-height: 320px; overflow: hidden; }
+.viewer canvas { display: block; width: 100%; height: 100%; outline: none; }
+.bar { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+.bar > * { pointer-events: auto; }
+.bar .sep { width: 1px; background: var(--line); margin: 2px 2px; }
+.bar label { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.legend { position: absolute; left: 12px; bottom: 48px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; display: grid; gap: 3px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.keys { position: absolute; left: 12px; bottom: 12px; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
+.keys b { color: var(--text); font-weight: 600; }
+.info { position: absolute; right: 12px; bottom: 48px; width: 330px; max-height: 60%; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; display: none; }
+.info h3 { margin: 0 0 4px; font-size: 13px; }
+.info ul { margin: 4px 0 0; padding-left: 16px; }
+.info a { color: var(--accent); text-decoration: none; }
+.info a:hover { text-decoration: underline; }
+.info .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-size: 12px; display: none; white-space: nowrap; z-index: 3; }
+.toast { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: var(--text); color: var(--panel); border-radius: 6px; padding: 5px 12px; font-size: 12.5px; display: none; z-index: 4; }
+.labels { position: absolute; left: 0; top: 0; pointer-events: none; }
+.gbubble { font: 600 11px/1 "Segoe UI", system-ui, sans-serif; color: var(--text); background: var(--panel); border: 1.5px solid var(--grid); border-radius: 999px; padding: 3px 6px; min-width: 22px; text-align: center; white-space: nowrap; }
+.llabel { font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif; color: var(--level); background: var(--panel); border: 1px solid var(--level); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.legend i.dash { background: none !important; border-top: 2px dashed; height: 0; width: 12px; vertical-align: 3px; }
+.nogl { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 30px; color: var(--muted); }
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; }
+  .viewer { order: -1; }
+  .tablewrap { border-right: 0; }
+  header, .toolbar { padding-left: 16px; padding-right: 16px; }
+  input[type=search] { min-width: 0; width: 100%; }
+  .keys { display: none; }
+  .info { width: auto; left: 12px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Changes in contact with concrete</h1>
+  <div class="meta" id="meta"></div>
+  <div class="stats" id="stats"></div>
+</header>
+<div class="toolbar">
+  <div class="group" id="layers"><span>Show</span></div>
+  <div class="group" id="fCt"><span>Contact</span></div>
+  <input type="search" id="q" placeholder="Search family, type, Id…">
+  <button class="act" id="csv">Export CSV</button>
+</div>
+<main>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Status</th><th>Element Id</th><th>Family / Type</th><th>Contact</th><th>Changes</th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No changes match these filters.</div>
+  </div>
+  <div class="viewer" id="viewer">
+    <div class="bar">
+      <button class="act" data-view="iso" title="Isometric view">Iso</button>
+      <button class="act" data-view="top" title="Plan view">Plan</button>
+      <button class="act" data-view="front" title="Front view">Front</button>
+      <button class="act" id="fit" title="Zoom to visible">Fit</button>
+      <span class="sep"></span>
+      <button class="act" id="bFocus" title="Zoom to selection (F)" disabled>Focus</button>
+      <button class="act" id="bIso" title="Isolate selection; concrete stays visible (I)" disabled>Isolate</button>
+      <button class="act" id="bHide" title="Hide selection (H)" disabled>Hide</button>
+      <button class="act" id="bShow" title="Show all (Shift+H)">Show all</button>
+      <span class="sep"></span>
+      <label><input type="checkbox" id="allConc"> All concrete</label>
+      <label><input type="checkbox" id="showGrids" checked> Grids</label>
+      <label><input type="checkbox" id="showLevels" checked> Levels</label>
+    </div>
+    <div class="legend">
+      <div><i style="background:var(--new)"></i>New</div>
+      <div><i style="background:var(--deleted)"></i>Deleted</div>
+      <div><i style="background:var(--mod-old)"></i>Modified (previous version)</div>
+      <div><i style="background:var(--mod-new)"></i>Modified (new version)</div>
+      <div><i style="background:#8a93a3;opacity:.6"></i>Concrete</div>
+      <div><i style="background:var(--pick)"></i>Selected</div>
+      <div><i class="dash" style="color:var(--grid)"></i>Grid</div>
+      <div><i class="dash" style="color:var(--level)"></i>Level</div>
+    </div>
+    <div class="keys"><b>Click</b> select · <b>Ctrl+click</b> add · <b>Double-click</b> orbit center · <b>Wheel</b> zoom to cursor · <b>Right/middle button</b> pan · <b>Esc</b> clear</div>
+    <div class="info" id="info"></div>
+    <div class="tip" id="tip"></div>
+    <div class="toast" id="toast"></div>
+    <div class="nogl" id="nogl">The 3D viewer needs an internet connection to load the three.js library.<br>The table and filters work offline.</div>
+  </div>
+</main>
+
+<script>
+const D = /*__DATA__*/null;
+</script>
+<script type="module">
+const S = D.summary, rows = D.rows;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const rowById = new Map(rows.map(r => [r.id, r]));
+const concById = new Map(D.concrete.map(c => [c.id, c]));
+
+// ---------- header
+document.title = 'Changes ' + S.scope_box;
+$('title').textContent = 'Changes in contact with concrete — ' + S.scope_box;
+$('meta').innerHTML = '<b>' + esc(S.link) + '</b>: ' + esc(S.old) + ' → ' + esc(S.new) +
+  ' · Concrete model: <b>' + esc(S.host) + '</b> · Tolerance ' + S.tolerance_mm + ' mm · Generated ' + esc(S.date);
+$('stats').innerHTML = [
+  ['New', S.created, 'var(--new)'],
+  ['Modified', S.modified, 'var(--mod-new)'],
+  ['Deleted', S.deleted, 'var(--deleted)'],
+].map(([l, n, c]) => '<div class="stat" style="border-left:3px solid ' + c + '"><div class="n">' + n + '</div><div class="l">' + l + '</div></div>').join('');
+
+// ---------- layers (3D + table) and filters
+const LAYERS = [
+  ['new', 'New', '--new', S.created],
+  ['deleted', 'Deleted', '--deleted', S.deleted],
+  ['modold', 'Modified (previous)', '--mod-old', S.modified],
+  ['modnew', 'Modified (new)', '--mod-new', S.modified],
+];
+const layerOn = { new: true, deleted: true, modold: true, modnew: true };
+LAYERS.forEach(([key, label, color, n]) => {
+  const b = document.createElement('button');
+  b.className = 'layer'; b.setAttribute('aria-pressed', 'true');
+  b.title = 'Show or hide: ' + label;
+  b.innerHTML = '<i style="background:var(' + color + ')"></i>' + label + ' <span class="n">' + n + '</span>';
+  b.onclick = () => {
+    layerOn[key] = !layerOn[key];
+    b.setAttribute('aria-pressed', String(layerOn[key]));
+    render();
+  };
+  $('layers').appendChild(b);
+});
+function rowLayerOn(r) {
+  if (r.status === 'New') return layerOn.new;
+  if (r.status === 'Deleted') return layerOn.deleted;
+  return layerOn.modold || layerOn.modnew;
+}
+const filters = { contact: new Set(['Penetrates', 'Touches']) };
+function chips(el, key, items) {
+  items.forEach(([v, color]) => {
+    const b = document.createElement('span');
+    b.className = 'chip'; b.setAttribute('role', 'button'); b.setAttribute('aria-pressed', 'true'); b.tabIndex = 0;
+    b.innerHTML = (color ? '<span class="dot" style="background:' + color + '"></span>' : '') + v;
+    const toggle = () => {
+      const on = b.getAttribute('aria-pressed') === 'true';
+      b.setAttribute('aria-pressed', on ? 'false' : 'true');
+      on ? filters[key].delete(v) : filters[key].add(v);
+      render();
+    };
+    b.onclick = toggle; b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    el.appendChild(b);
+  });
+}
+chips($('fCt'), 'contact', [['Penetrates'], ['Touches']]);
+$('q').oninput = render;
+
+function visibleRows() {
+  const q = $('q').value.trim().toLowerCase();
+  return rows.filter(r => rowLayerOn(r) && filters.contact.has(r.contact) &&
+    (!q || (r.family + ' ' + r.type + ' ' + r.id + ' ' + r.category + ' ' + r.concrete.join(' ')).toLowerCase().includes(q)));
+}
+
+// selection keys: 'r:<id>' for changed elements, 'c:<id>' for concrete
+const sel = new Set();
+let viewer = null;
+
+function render() {
+  const vr = visibleRows();
+  $('tb').innerHTML = vr.map(r =>
+    '<tr class="r' + (sel.has('r:' + r.id) ? ' sel' : '') + '" data-id="' + r.id + '">' +
+    '<td><span class="st ' + r.status + '">' + r.status + '</span></td>' +
+    '<td class="id">' + r.id + '</td>' +
+    '<td>' + esc(r.family) + '<div class="sub">' + esc(r.type) + ' · ' + esc(r.category) + '</div></td>' +
+    '<td>' + r.contact + '</td>' +
+    '<td>' + (r.changes.length ? '<div class="sub">' + r.changes.map(esc).join('<br>') + '</div>' : '<span class="sub">—</span>') + '</td></tr>').join('');
+  $('empty').hidden = vr.length > 0;
+  $('tb').querySelectorAll('tr.r').forEach(tr => tr.onclick = (e) => {
+    setSelection('r:' + tr.dataset.id, e.ctrlKey || e.metaKey || e.shiftKey);
+    if (viewer) viewer.focus();
+  });
+  if (viewer) viewer.update();
+}
+
+function setSelection(key, additive) {
+  if (!additive) sel.clear();
+  if (key) { if (additive && sel.has(key)) sel.delete(key); else sel.add(key); }
+  syncSelection(true);
+}
+
+function syncSelection(fromTable) {
+  document.querySelectorAll('tr.r').forEach(tr => tr.classList.toggle('sel', sel.has('r:' + tr.dataset.id)));
+  if (!fromTable) {
+    const first = [...sel].find(k => k[0] === 'r');
+    const tr = first && document.querySelector('tr.r[data-id="' + first.slice(2) + '"]');
+    if (tr) tr.scrollIntoView({ block: 'nearest' });
+  }
+  ['bFocus', 'bIso', 'bHide'].forEach(id => $(id).disabled = sel.size === 0);
+  showInfo();
+  if (viewer) viewer.update();
+}
+
+function idsOf(kind) { return [...sel].filter(k => k[0] === kind).map(k => k.slice(2)); }
+
+function showInfo() {
+  const info = $('info');
+  if (!sel.size) { info.style.display = 'none'; return; }
+  info.style.display = 'block';
+  let html = '';
+  if (sel.size === 1) {
+    const [k] = sel, id = +k.slice(2);
+    if (k[0] === 'r') {
+      const r = rowById.get(id);
+      html = '<h3>' + esc(r.family) + '</h3><div class="sub">' + esc(r.type) + ' · ' + esc(r.category) + ' · Id ' + r.id + '</div>' +
+        '<div style="margin-top:6px"><span class="st ' + r.status + '">' + r.status + '</span> · ' + r.contact + '</div>' +
+        (r.changes.length ? '<ul>' + r.changes.map(c => '<li>' + esc(c) + '</li>').join('') + '</ul>' : '') +
+        '<div style="margin-top:6px">In contact with:</div><ul>' +
+        r.concrete_ids.map((c, i) => '<li><a href="#" data-conc="' + c + '">' + esc(r.concrete[i]) + '</a></li>').join('') + '</ul>';
+    } else {
+      const c = concById.get(id);
+      const touching = rows.filter(r => r.concrete_ids.includes(id));
+      html = '<h3>Concrete</h3><div>' + esc(c.name) + '</div><div class="sub">Model: ' + esc(S.host) + '</div>' +
+        '<div style="margin-top:6px">' + (touching.length ? touching.length + ' change(s) in contact:' : 'No changes in contact') + '</div>' +
+        (touching.length ? '<ul>' + touching.map(r => '<li><a href="#" data-row="' + r.id + '">' + esc(r.family) + ' [' + r.id + ']</a></li>').join('') + '</ul>' : '');
+    }
+  } else {
+    const nr = idsOf('r').length, nc = idsOf('c').length;
+    html = '<h3>' + sel.size + ' elements selected</h3><div class="sub">' +
+      (nr ? nr + ' from linked model' : '') + (nr && nc ? ' · ' : '') + (nc ? nc + ' concrete' : '') + '</div>';
+  }
+  const nr = idsOf('r').length, nc = idsOf('c').length;
+  const isoLabel = nr ? (sel.size === 1 ? 'Isolate element' : 'Isolate selection') : 'Isolate changes touching it';
+  html += '<div class="row">' +
+    (viewer ? '<button class="act primary" data-act="iso">' + isoLabel + '</button>' : '') +
+    (viewer && viewer.isIsolated() ? '<button class="act" data-act="show">Show all</button>' : '') + '</div>' +
+    '<div class="row">' +
+    (nr ? '<button class="act" data-copy="r">Copy linked IDs (' + nr + ')</button>' : '') +
+    (nc ? '<button class="act" data-copy="c">Copy concrete IDs (' + nc + ')</button>' : '') + '</div>' +
+    '<div class="sub" style="margin-top:4px">In Revit: Manage › Select by ID, in the matching model.</div>';
+  info.innerHTML = html;
+  info.querySelectorAll('[data-conc]').forEach(a => a.onclick = (e) => { e.preventDefault(); setSelection('c:' + a.dataset.conc, false); viewer && viewer.focus(); });
+  info.querySelectorAll('[data-row]').forEach(a => a.onclick = (e) => { e.preventDefault(); setSelection('r:' + a.dataset.row, false); viewer && viewer.focus(); });
+  info.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyIds(idsOf(b.dataset.copy)));
+  info.querySelectorAll('[data-act]').forEach(b => b.onclick = () => b.dataset.act === 'iso' ? viewer.isolate() : viewer.showAll());
+}
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.style.display = 'none', 1800);
+}
+async function copyIds(ids) {
+  const txt = ids.join(';');
+  try { await navigator.clipboard.writeText(txt); toast(ids.length + ' ID(s) copied'); }
+  catch (e) { window.prompt('Copy the IDs:', txt); }
+}
+
+$('csv').onclick = () => {
+  const vr = visibleRows();
+  const head = ['Status', 'Element Id', 'Category', 'Family', 'Type', 'Contact', 'Movement (mm)', 'Changes', 'In contact with'];
+  const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [head.map(q).join(',')].concat(vr.map(r => [r.status, r.id, r.category, r.family, r.type, r.contact, r.move_mm || '', r.changes.join(' | '), r.concrete.join(' | ')].map(q).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'Changes_' + S.scope_box.replace(/\W+/g, '_') + '.csv'; a.click();
+};
+
+render();
+syncSelection(true);
+
+// ---------- 3D viewer
+let THREE, OrbitControls, CSS2DRenderer, CSS2DObject;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+  ({ CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js'));
+} catch (e) {
+  $('nogl').style.display = 'flex';
+}
+if (THREE) viewer = createViewer();
+
+function createViewer() {
+  const host = $('viewer');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  host.insertBefore(renderer.domElement, host.firstChild);
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.domElement.className = 'labels';
+  host.insertBefore(labelRenderer.domElement, renderer.domElement.nextSibling);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20000);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.15;
+  controls.zoomToCursor = true;
+  controls.screenSpacePanning = true;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x667080, 2.2));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(30, 60, 20); scene.add(sun);
+
+  function geom(m) {
+    const p = m.p, pos = new Float32Array(p.length);
+    for (let i = 0; i < p.length; i += 3) { pos[i] = p[i] / 1000; pos[i + 1] = p[i + 2] / 1000; pos[i + 2] = -p[i + 1] / 1000; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(m.i); g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
+    return g;
+  }
+
+  // items: key -> { key, kind, parts: [{ mesh, layer }], touched }
+  const items = new Map();
+  const accent = () => new THREE.Color(css('--pick'));
+  D.concrete.forEach(c => {
+    if (c.mesh < 0) return;
+    const mat = new THREE.MeshLambertMaterial({ color: 0x8a93a3, transparent: true, opacity: c.touched ? 0.35 : 0.12, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geom(D.meshes[c.mesh]), mat);
+    mesh.renderOrder = 2;
+    mesh.userData.key = 'c:' + c.id;
+    mesh.userData.baseOpacity = mat.opacity;
+    scene.add(mesh);
+    items.set('c:' + c.id, { key: 'c:' + c.id, kind: 'c', parts: [{ mesh, layer: null }], touched: c.touched });
+  });
+  const LAYER_COLOR = { new: '--new', deleted: '--deleted', modold: '--mod-old', modnew: '--mod-new' };
+  function part(key, meshIdx, layer, translucent) {
+    const col = new THREE.Color(css(LAYER_COLOR[layer]) || '#888');
+    const g = geom(D.meshes[meshIdx]);
+    const mat = new THREE.MeshLambertMaterial({ color: col, emissive: 0x000000 });
+    if (translucent) { mat.transparent = true; mat.opacity = 0.75; mat.depthWrite = false; }
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.userData.key = key;
+    mesh.renderOrder = translucent ? 1 : 0;
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 30), new THREE.LineBasicMaterial({ color: col.clone().multiplyScalar(0.55) })));
+    scene.add(mesh);
+    return { mesh, layer };
+  }
+  rows.forEach(r => {
+    const key = 'r:' + r.id, parts = [];
+    if (r.status === 'New' && r.mesh_new >= 0) parts.push(part(key, r.mesh_new, 'new'));
+    if (r.status === 'Deleted' && r.mesh_old >= 0) parts.push(part(key, r.mesh_old, 'deleted'));
+    if (r.status === 'Modified') {
+      if (r.mesh_old >= 0) parts.push(part(key, r.mesh_old, 'modold', true));
+      if (r.mesh_new >= 0) parts.push(part(key, r.mesh_new, 'modnew'));
+    }
+    items.set(key, { key, kind: 'r', parts });
+  });
+
+  // ---- reference: grids (dashed, with name bubbles at both ends) and levels (outline + label)
+  const REF = D.ref || { grids: [], levels: [], rect: null, grid_z: 0 };
+  const toV = (x, y, z) => new THREE.Vector3(x / 1000, z / 1000, -y / 1000);
+  const gridGroup = new THREE.Group(), levelGroup = new THREE.Group();
+  scene.add(gridGroup); scene.add(levelGroup);
+  const gridMat = new THREE.LineDashedMaterial({ color: new THREE.Color(css('--grid')), dashSize: 1.2, gapSize: 0.5 });
+  const byName = {};
+  (REF.grids || []).forEach(g => (byName[g.name] = byName[g.name] || []).push(g));
+  Object.keys(byName).forEach(name => {
+    const segs = byName[name];
+    segs.forEach(g => {
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(g.p.map(([x, y]) => toV(x, y, REF.grid_z))), gridMat);
+      line.computeLineDistances();
+      gridGroup.add(line);
+    });
+    const a = segs[0].p[0], lastSeg = segs[segs.length - 1], b = lastSeg.p[lastSeg.p.length - 1];
+    [a, b].forEach(([x, y]) => {
+      const div = document.createElement('div');
+      div.className = 'gbubble'; div.textContent = name;
+      const o = new CSS2DObject(div); o.position.copy(toV(x, y, REF.grid_z));
+      gridGroup.add(o);
+    });
+  });
+  if (REF.rect) {
+    const [x0, y0, x1, y1] = REF.rect;
+    const levelMat = new THREE.LineDashedMaterial({ color: new THREE.Color(css('--level')), dashSize: 0.8, gapSize: 0.4 });
+    (REF.levels || []).forEach(l => {
+      const pts = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(([x, y]) => toV(x, y, l.z));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), levelMat);
+      line.computeLineDistances();
+      levelGroup.add(line);
+      const div = document.createElement('div');
+      div.className = 'llabel'; div.textContent = l.name + (l.elev ? '  ·  EL ' + l.elev : '');
+      const o = new CSS2DObject(div); o.position.copy(toV(x0, y1, l.z));
+      levelGroup.add(o);
+    });
+  }
+  // CSS2DRenderer ignores parent visibility, so toggle every label too.
+  function setRefVisible(group, on) {
+    group.visible = on;
+    group.traverse(o => { if (o.isCSS2DObject) { o.visible = on; o.element.style.display = on ? '' : 'none'; } });
+  }
+  $('showGrids').onchange = (e) => setRefVisible(gridGroup, e.target.checked);
+  $('showLevels').onchange = (e) => setRefVisible(levelGroup, e.target.checked);
+
+  // ---- visibility: table filters, user-hidden, isolation
+  const hidden = new Set();
+  let isolated = null;
+  // Isolation only applies to linked-model elements; concrete keeps its normal visibility.
+  function isVisible(it, filtered) {
+    if (!it.parts.length || hidden.has(it.key)) return false;
+    if (it.kind === 'r') return filtered.has(+it.key.slice(2)) && (!isolated || isolated.has(it.key));
+    return $('allConc').checked || it.touched || sel.has(it.key);
+  }
+  let hoverKey = null;
+  function update() {
+    const filtered = new Set(visibleRows().map(r => r.id));
+    const acc = accent();
+    items.forEach(it => {
+      const v = isVisible(it, filtered), s = sel.has(it.key), h = hoverKey === it.key;
+      it.parts.forEach(p => {
+        p.mesh.visible = v && (!p.layer || layerOn[p.layer]);
+        const m = p.mesh.material;
+        m.emissive.copy(s || h ? acc : new THREE.Color(0));
+        m.emissiveIntensity = s ? 0.7 : (h ? 0.3 : 0);
+        if (it.kind === 'c') { m.opacity = s ? 0.6 : (h ? Math.max(0.3, p.mesh.userData.baseOpacity) : p.mesh.userData.baseOpacity); }
+      });
+    });
+  }
+
+  // ---- camera helpers
+  function boxOf(meshes) {
+    const box = new THREE.Box3();
+    meshes.forEach(m => box.expandByObject(m));
+    return box;
+  }
+  function visibleMeshes(kind) {
+    const out = [];
+    items.forEach(it => { if (!kind || it.kind === kind) it.parts.forEach(p => { if (p.mesh.visible) out.push(p.mesh); }); });
+    return out;
+  }
+  let anim = null;
+  function flyTo(target, position) {
+    anim = { t0: performance.now(), dur: 350, fromT: controls.target.clone(), toT: target, fromP: camera.position.clone(), toP: position };
+  }
+  function frameBox(box, dir) {
+    if (box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3());
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 0.4);
+    const dist = r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.05;
+    const d = (dir || camera.position.clone().sub(controls.target)).clone().normalize();
+    flyTo(c, c.clone().add(d.multiplyScalar(dist)));
+  }
+  function frameDefault(dir) {
+    let ms = visibleMeshes('r');
+    if (!ms.length) ms = visibleMeshes();
+    frameBox(boxOf(ms), dir);
+  }
+  const VIEWS = { iso: new THREE.Vector3(1, 0.9, 1.1), top: new THREE.Vector3(0, 1, 0.0001), front: new THREE.Vector3(0, 0.05, 1) };
+  document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => frameDefault(VIEWS[b.dataset.view]));
+  $('fit').onclick = () => frameDefault();
+
+  function focus() {
+    const its = [...sel].map(k => items.get(k)).filter(Boolean);
+    let ms = [].concat(...its.map(it => it.parts.filter(p => p.mesh.visible).map(p => p.mesh)));
+    if (!ms.length) ms = [].concat(...its.map(it => it.parts.map(p => p.mesh)));
+    if (ms.length) frameBox(boxOf(ms));
+  }
+  $('bFocus').onclick = focus;
+  // Isolate the selected linked elements (a selected concrete element isolates
+  // the changes touching it). Concrete stays visible for reference.
+  function isolate() {
+    if (!sel.size) return;
+    const keys = new Set();
+    sel.forEach(k => {
+      if (k[0] === 'r') keys.add(k);
+      else rows.filter(r => r.concrete_ids.includes(+k.slice(2))).forEach(r => keys.add('r:' + r.id));
+    });
+    if (!keys.size) return;
+    isolated = keys;
+    hidden.clear(); update(); isoState(); focus();
+  }
+  $('bIso').onclick = isolate;
+  function hideSel() { sel.forEach(k => hidden.add(k)); sel.clear(); syncSelection(false); }
+  $('bHide').onclick = hideSel;
+  function showAll() { isolated = null; hidden.clear(); update(); isoState(); }
+  function isoState() {
+    const b = $('bShow');
+    b.textContent = isolated ? 'Show all (' + isolated.size + ' isolated)' : 'Show all';
+    b.classList.toggle('on', !!isolated);
+    showInfo();
+  }
+  $('bShow').onclick = showAll;
+  $('allConc').onchange = update;
+
+  // ---- picking
+  const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+  function pick(e, preferChanged = true) {
+    const rc = renderer.domElement.getBoundingClientRect();
+    ptr.set(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
+    ray.setFromCamera(ptr, camera);
+    if (preferChanged) {
+      const h = ray.intersectObjects(visibleMeshes('r'), false)[0];
+      if (h) return h;
+    }
+    return ray.intersectObjects(visibleMeshes(), false)[0];
+  }
+  let down = null;
+  const cv = renderer.domElement;
+  cv.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, b: e.button }; });
+  cv.addEventListener('pointerup', e => {
+    if (!down || down.b !== 0 || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) { down = null; return; }
+    down = null;
+    const h = pick(e);
+    const add = e.ctrlKey || e.metaKey || e.shiftKey;
+    if (h) { if (!add) sel.clear(); const k = h.object.userData.key; if (add && sel.has(k)) sel.delete(k); else sel.add(k); }
+    else if (!add) sel.clear();
+    syncSelection(false);
+  });
+  cv.addEventListener('dblclick', e => {
+    const h = pick(e, false);
+    if (h) flyTo(h.point.clone(), camera.position.clone().add(h.point.clone().sub(controls.target)));
+  });
+  let moveQueued = null;
+  cv.addEventListener('pointermove', e => {
+    if (e.buttons) { $('tip').style.display = 'none'; return; }
+    if (moveQueued) return;
+    moveQueued = requestAnimationFrame(() => {
+      moveQueued = null;
+      const h = pick(e);
+      const k = h ? h.object.userData.key : null;
+      const tip = $('tip');
+      if (k) {
+        const id = +k.slice(2);
+        tip.textContent = k[0] === 'r' ? rowById.get(id).family + ' [' + id + ']' : concById.get(id).name;
+        const rc = host.getBoundingClientRect();
+        tip.style.left = (e.clientX - rc.left + 14) + 'px'; tip.style.top = (e.clientY - rc.top + 14) + 'px';
+        tip.style.display = 'block';
+      } else tip.style.display = 'none';
+      cv.style.cursor = k ? 'pointer' : '';
+      if (k !== hoverKey) { hoverKey = k; update(); }
+    });
+  });
+  cv.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; if (hoverKey) { hoverKey = null; update(); } });
+
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    const k = e.key.toLowerCase();
+    if (k === 'escape') { sel.clear(); syncSelection(false); }
+    else if (k === 'f') focus();
+    else if (k === 'i') isolate();
+    else if (k === 'h' && e.shiftKey) showAll();
+    else if (k === 'h') hideSel();
+  });
+
+  // ---- render loop
+  function resize() {
+    const w = host.clientWidth, h = host.clientHeight;
+    renderer.setSize(w, h, false); labelRenderer.setSize(w, h);
+    camera.aspect = w / Math.max(h, 1); camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(host); resize();
+  function bg() { scene.background = new THREE.Color(css('--viewer')); update(); }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', bg);
+  bg();
+  camera.position.set(30, 30, 30);
+  frameDefault(VIEWS.iso);
+  (function loop(now) {
+    if (anim) {
+      const t = Math.min(1, (performance.now() - anim.t0) / anim.dur), k = 1 - Math.pow(1 - t, 3);
+      controls.target.lerpVectors(anim.fromT, anim.toT, k);
+      camera.position.lerpVectors(anim.fromP, anim.toP, k);
+      if (t >= 1) anim = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  })();
+
+  return { update, focus, isolate, showAll, isIsolated: () => !!isolated };
+}
+</script>
+</body>
+</html>

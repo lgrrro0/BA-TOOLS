@@ -1,0 +1,21 @@
+{
+  "tolerance_mm": 25,
+  "concrete": {
+    "exclude_categories": [
+      "OST_Rooms", "OST_MEPSpaces", "OST_Areas", "OST_Mass",
+      "OST_VolumeOfInterest", "OST_Cameras", "OST_Lines", "OST_RvtLinks"
+    ]
+  },
+  "compare_params": [
+    "Size", "Overall Size", "Diameter", "Outside Diameter", "Length",
+    "Offset", "Middle Elevation", "Slope",
+    "System Type", "System Classification", "System Name", "Comments"
+  ],
+  "exclusions": {
+    "A_TP-GRAVITY-PLUMBING": {
+      "categories": ["Center Line"],
+      "family_regex": ["Hanger", "Upper Attachment", "^GTP$"],
+      "type_regex": []
+    }
+  }
+}
